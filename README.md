@@ -1,4 +1,4 @@
-# Flow4 - Interactive Flow Free Puzzle Solver and Player
+# Flo4 - Interactive Flow Free Puzzle Solver and Player
 
 <img width="808" height="825" alt="image" src="https://github.com/user-attachments/assets/7ae65d5e-35d6-43a2-b64d-36333352b1a8" />
 
