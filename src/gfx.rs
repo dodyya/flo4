@@ -1,6 +1,6 @@
 use std::cmp::min;
 
-use pixels::{Pixels, SurfaceTexture};
+use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use winit::{
     dpi::PhysicalSize,
     event_loop::EventLoop,
@@ -27,13 +27,17 @@ pub struct Gfx {
 }
 
 impl Gfx {
-    pub fn new(cols: u32, rows: u32) -> (Self, EventLoop<()>) {
+    pub async fn new(cols: u32, rows: u32) -> (Self, EventLoop<()>) {
         let event_loop = EventLoop::new();
-        // physical window size = virtual size × scale
+        // physical window size = virtual size × scale; the web build uses a
+        // smaller fixed canvas instead of the full native resolution.
+        #[cfg(not(target_arch = "wasm32"))]
         let physical_size = PhysicalSize::new(
             cols * PIXEL_SCALE * PIXELS_PER_CELL,
             rows * PIXEL_SCALE * PIXELS_PER_CELL,
         );
+        #[cfg(target_arch = "wasm32")]
+        let physical_size = PhysicalSize::new(cols * 60, rows * 60);
 
         let window = WindowBuilder::new()
             .with_title("Flow Four")
@@ -42,16 +46,33 @@ impl Gfx {
             .build(&event_loop)
             .unwrap();
 
+        // On the web, attach winit's canvas to the host page.
+        #[cfg(target_arch = "wasm32")]
+        {
+            use winit::platform::web::WindowExtWebSys;
+            let canvas = window.canvas();
+            canvas.set_width(physical_size.width);
+            canvas.set_height(physical_size.height);
+            let doc = web_sys::window().unwrap().document().unwrap();
+            let el = web_sys::Element::from(canvas);
+            match doc.get_element_by_id("flo4-canvas-container") {
+                Some(container) => container.append_child(&el).unwrap(),
+                None => doc.body().unwrap().append_child(&el).unwrap(),
+            };
+        }
+
         // SurfaceTexture uses the physical (window) pixels,
         // but the 'logical' pixel buffer stays at width×height
         let surface_texture =
             SurfaceTexture::new(physical_size.width, physical_size.height, &window);
 
-        let pixels = Pixels::new(
+        let pixels = PixelsBuilder::new(
             cols * PIXELS_PER_CELL,
             rows * PIXELS_PER_CELL,
             surface_texture,
         )
+        .build_async()
+        .await
         .unwrap();
 
         (

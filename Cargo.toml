@@ -3,11 +3,32 @@ name = "flo4"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 colored = "3.0.0"
 hex = "0.4.3"
 hsv = "0.1.1"
 pixels = "0.13"
-rand = "0.9.1"
-winit="0.28"
-winit_input_helper = "0.14"
+winit = "0.28"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+pollster = "0.3"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+console_error_panic_hook = "0.1"
+web-sys = { version = "0.3", features = [
+    "Document",
+    "Window",
+    "Location",
+    "Element",
+    "Node",
+    "HtmlElement",
+    "HtmlCanvasElement",
+] }
+
+[profile.release]
+debug = true
