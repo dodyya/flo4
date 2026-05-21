@@ -1,7 +1,10 @@
 fn main() {
-    let mode = match std::env::args().nth(1).as_deref() {
-        Some("solve") => flo4::Mode::Solve,
-        _ => flo4::Mode::Play,
+    let args: Vec<String> = std::env::args().collect();
+    let mode = if args.iter().any(|a| a == "solve") {
+        flo4::Mode::Solve
+    } else {
+        flo4::Mode::Play
     };
-    pollster::block_on(flo4::run(mode));
+    let size = args.iter().skip(1).find_map(|a| a.parse::<usize>().ok()).unwrap_or(9);
+    pollster::block_on(flo4::run(mode, size));
 }

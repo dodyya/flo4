@@ -1,5 +1,4 @@
 use crate::board::{Board, Cell};
-use crate::{COLS, ROWS};
 
 pub struct Game {
     board: Board,
@@ -84,7 +83,9 @@ impl Flow {
 
 impl Game {
     pub fn new(board_string: &str) -> Self {
-        let mut board = Board::load_board(board_string, ROWS, COLS);
+        let rows = board_string.lines().count();
+        let cols = board_string.lines().next().map_or(0, |l| l.chars().count());
+        let mut board = Board::load_board(board_string, rows, cols);
         board.strip();
         let num_colors = board.num_colors();
 

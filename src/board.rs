@@ -1,8 +1,6 @@
 use std::io;
 use std::ops::{Index, IndexMut};
 
-use crate::COLS;
-use crate::ROWS;
 use colored::ColoredString;
 use colored::Colorize;
 
@@ -81,11 +79,11 @@ impl Board {
             out[1] = self[(row, col - 1)];
         }
 
-        if row < ROWS - 1 {
+        if row < self.rows - 1 {
             out[2] = self[(row + 1, col)];
         }
 
-        if col < COLS - 1 {
+        if col < self.cols - 1 {
             out[3] = self[(row, col + 1)];
         }
         out
@@ -106,13 +104,13 @@ impl Board {
             }
         }
 
-        if row < ROWS - 1 {
+        if row < self.rows - 1 {
             if self[(row + 1, col)] == Cell::Empty {
                 out[2] = Some((row + 1, col));
             }
         }
 
-        if col < COLS - 1 {
+        if col < self.cols - 1 {
             if self[(row, col + 1)] == Cell::Empty {
                 out[3] = Some((row, col + 1));
             }
@@ -127,7 +125,7 @@ impl Board {
                 return Some((row - 1, col));
             }
         }
-        if row < ROWS - 1 {
+        if row < self.rows - 1 {
             if self[(row + 1, col)] == target {
                 return Some((row + 1, col));
             }
@@ -137,7 +135,7 @@ impl Board {
                 return Some((row, col - 1));
             }
         }
-        if col < COLS - 1 {
+        if col < self.cols - 1 {
             if self[(row, col + 1)] == target {
                 return Some((row, col + 1));
             }
@@ -148,7 +146,7 @@ impl Board {
     ///For graphics: Every single path cell can be drawn by describing the neighbors of the same color it has in the following way:
     pub fn orientation(&self, index: usize) -> u8 {
         let mut out = 0;
-        let neighbors = self.neighbors_or_empty(Self::inverse_ind(index));
+        let neighbors = self.neighbors_or_empty(self.inverse_ind(index));
         let own_color = self[index].color();
         for i in 0..4 {
             if !neighbors[i].is_empty() && neighbors[i].color() == own_color {
@@ -158,13 +156,13 @@ impl Board {
         out
     }
 
-    pub fn inverse_ind(index: usize) -> (usize, usize) {
-        (index / COLS, index % COLS)
+    pub fn inverse_ind(&self, index: usize) -> (usize, usize) {
+        (index / self.cols, index % self.cols)
     }
 
     pub fn is_solved(&self) -> bool {
-        for i in 0..ROWS {
-            for j in 0..COLS {
+        for i in 0..self.rows {
+            for j in 0..self.cols {
                 match self[(i, j)] {
                     Cell::Empty => return false,
                     Cell::Path { color } => {
@@ -185,8 +183,8 @@ impl Board {
 
     ///Checks whether paths are laid out legally
     pub fn is_legal(&self) -> bool {
-        for i in 0..ROWS {
-            for j in 0..COLS {
+        for i in 0..self.rows {
+            for j in 0..self.cols {
                 match self[(i, j)] {
                     Cell::Empty => {}
                     Cell::Path { color } => {
@@ -358,7 +356,7 @@ impl Index<(usize, usize)> for Board {
             panic!();
         }
 
-        &self.cells[row * COLS + col]
+        &self.cells[row * self.cols + col]
     }
 }
 
@@ -381,7 +379,7 @@ impl IndexMut<(usize, usize)> for Board {
             panic!();
         }
 
-        &mut self.cells[row * COLS + col]
+        &mut self.cells[row * self.cols + col]
     }
 }
 

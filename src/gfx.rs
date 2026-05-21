@@ -29,42 +29,48 @@ pub struct Gfx {
 impl Gfx {
     pub async fn new(cols: u32, rows: u32) -> (Self, EventLoop<()>) {
         let event_loop = EventLoop::new();
-        // physical window size = virtual size × scale; the web build uses a
-        // smaller fixed canvas instead of the full native resolution.
-        #[cfg(not(target_arch = "wasm32"))]
-        let physical_size = PhysicalSize::new(
-            cols * PIXEL_SCALE * PIXELS_PER_CELL,
-            rows * PIXEL_SCALE * PIXELS_PER_CELL,
-        );
-        #[cfg(target_arch = "wasm32")]
-        let physical_size = PhysicalSize::new(cols * 60, rows * 60);
 
-        let window = WindowBuilder::new()
+        let mut builder = WindowBuilder::new()
             .with_title("Flow Four")
-            .with_inner_size(physical_size)
-            .with_resizable(false)
-            .build(&event_loop)
-            .unwrap();
+            .with_resizable(false);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            builder = builder.with_inner_size(PhysicalSize::new(
+                cols * PIXEL_SCALE * PIXELS_PER_CELL,
+                rows * PIXEL_SCALE * PIXELS_PER_CELL,
+            ));
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            builder = builder.with_inner_size(winit::dpi::LogicalSize::new(640.0, 640.0));
+        }
+        let window = builder.build(&event_loop).unwrap();
 
-        // On the web, attach winit's canvas to the host page.
+        // On the web, attach winit's canvas and let winit own its sizing, so
+        // cursor coordinates stay consistent.
         #[cfg(target_arch = "wasm32")]
         {
             use winit::platform::web::WindowExtWebSys;
-            let canvas = window.canvas();
-            canvas.set_width(physical_size.width);
-            canvas.set_height(physical_size.height);
+            let el = web_sys::Element::from(window.canvas());
             let doc = web_sys::window().unwrap().document().unwrap();
-            let el = web_sys::Element::from(canvas);
             match doc.get_element_by_id("flo4-canvas-container") {
                 Some(container) => container.append_child(&el).unwrap(),
                 None => doc.body().unwrap().append_child(&el).unwrap(),
             };
         }
 
-        // SurfaceTexture uses the physical (window) pixels,
-        // but the 'logical' pixel buffer stays at width×height
-        let surface_texture =
-            SurfaceTexture::new(physical_size.width, physical_size.height, &window);
+        #[cfg(not(target_arch = "wasm32"))]
+        let (surf_w, surf_h) = {
+            let s = window.inner_size();
+            (s.width.max(1), s.height.max(1))
+        };
+        #[cfg(target_arch = "wasm32")]
+        let (surf_w, surf_h) = {
+            let dpr = web_sys::window().unwrap().device_pixel_ratio();
+            let px = (640.0 * dpr).round().max(1.0) as u32;
+            (px, px)
+        };
+        let surface_texture = SurfaceTexture::new(surf_w, surf_h, &window);
 
         let pixels = PixelsBuilder::new(
             cols * PIXELS_PER_CELL,

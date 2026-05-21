@@ -18,27 +18,41 @@ use winit::{
     event_loop::ControlFlow,
 };
 
-const ROWS: usize = 12;
-const COLS: usize = 12;
 const SOLVE_STEPS_PER_FRAME: u32 = 16;
 
-// The 150 12x12 puzzles, bundled in so the web build needs no filesystem.
-const PUZZLES: &str = include_str!("puzzles_12x12.txt");
+// Puzzles for each grid size, bundled in so the web build needs no filesystem.
+const PUZZLES_6: &str = include_str!("puzzles_6x6.txt");
+const PUZZLES_9: &str = include_str!("puzzles_9x9.txt");
+const PUZZLES_12: &str = include_str!("puzzles_12x12.txt");
 
+#[derive(Clone, Copy)]
 pub enum Mode {
     Play,
     Solve,
 }
 
-fn nth_puzzle(n: u32) -> &'static str {
-    let all: Vec<&str> = PUZZLES.split("\n@@@\n").collect();
+fn nth_puzzle(size: usize, n: u32) -> &'static str {
+    let bundle = match size {
+        6 => PUZZLES_6,
+        12 => PUZZLES_12,
+        _ => PUZZLES_9,
+    };
+    let all: Vec<&str> = bundle
+        .split("\n@@@\n")
+        .filter(|p| !p.trim().is_empty())
+        .collect();
     all[((n.max(1) - 1) as usize) % all.len()].trim()
 }
 
-fn solver_for(n: u32) -> SolverStack {
-    let mut board = Board::load_board(nth_puzzle(n), ROWS, COLS);
+fn solver_for(size: usize, n: u32) -> SolverStack {
+    let mut board = Board::load_board(nth_puzzle(size, n), size, size);
     board.strip();
     SolverStack::new(Solver::new(&board))
+}
+
+fn display_size(gfx: &gfx::Gfx) -> (f64, f64) {
+    let s = gfx.window.inner_size();
+    (s.width.max(1) as f64, s.height.max(1) as f64)
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -48,26 +62,37 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen(start)]
 pub fn start() {
     console_error_panic_hook::set_once();
-    let solve = web_sys::window()
+    let query = web_sys::window()
         .and_then(|w| w.location().search().ok())
-        .map_or(false, |s| s.contains("solve"));
-    let mode = if solve { Mode::Solve } else { Mode::Play };
-    wasm_bindgen_futures::spawn_local(run(mode));
+        .unwrap_or_default();
+    let mode = if query.contains("solve") {
+        Mode::Solve
+    } else {
+        Mode::Play
+    };
+    let size = if query.contains("res=6") {
+        6
+    } else if query.contains("res=12") {
+        12
+    } else {
+        9
+    };
+    wasm_bindgen_futures::spawn_local(run(mode, size));
 }
 
-pub async fn run(mode: Mode) {
+pub async fn run(mode: Mode, size: usize) {
     match mode {
-        Mode::Play => run_play().await,
-        Mode::Solve => run_solve().await,
+        Mode::Play => run_play(size).await,
+        Mode::Solve => run_solve(size).await,
     }
 }
 
-async fn run_play() {
+async fn run_play(size: usize) {
     let mut n = 1;
-    let mut game = Game::new(nth_puzzle(n));
+    let mut game = Game::new(nth_puzzle(size, n));
     let mut col = 0;
     let mut row = 0;
-    let (mut gfx, event_loop) = gfx::Gfx::new(ROWS as u32, COLS as u32).await;
+    let (mut gfx, event_loop) = gfx::Gfx::new(size as u32, size as u32).await;
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -88,7 +113,7 @@ async fn run_play() {
                             .unwrap(),
                     );
                 }
-                game = Game::new(nth_puzzle(n));
+                game = Game::new(nth_puzzle(size, n));
             }
         }
 
@@ -108,15 +133,13 @@ async fn run_play() {
                     _ => {}
                 },
                 WindowEvent::CursorMoved { position, .. } => {
-                    let size = gfx.window.inner_size();
-                    let new_col = min(
-                        (position.x * COLS as f64 / size.width.max(1) as f64) as usize,
-                        COLS - 1,
-                    );
-                    let new_row = min(
-                        (position.y * ROWS as f64 / size.height.max(1) as f64) as usize,
-                        ROWS - 1,
-                    );
+                    let (cols, rows) = {
+                        let b = game.get_board();
+                        (b.cols.max(1), b.rows.max(1))
+                    };
+                    let (w, h) = display_size(&gfx);
+                    let new_col = min((position.x * cols as f64 / w) as usize, cols - 1);
+                    let new_row = min((position.y * rows as f64 / h) as usize, rows - 1);
                     if new_row != row || new_col != col {
                         row = new_row;
                         col = new_col;
@@ -129,11 +152,11 @@ async fn run_play() {
     });
 }
 
-async fn run_solve() {
+async fn run_solve(size: usize) {
     let mut n = 1;
-    let mut solver = solver_for(n);
+    let mut solver = solver_for(size, n);
     let mut hold = 0u32;
-    let (mut gfx, event_loop) = gfx::Gfx::new(ROWS as u32, COLS as u32).await;
+    let (mut gfx, event_loop) = gfx::Gfx::new(size as u32, size as u32).await;
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -143,7 +166,7 @@ async fn run_solve() {
                 hold -= 1;
                 if hold == 0 {
                     n += 1;
-                    solver = solver_for(n);
+                    solver = solver_for(size, n);
                 }
             } else if solver.done() || solver.failed() {
                 hold = 24;

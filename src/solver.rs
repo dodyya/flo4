@@ -46,7 +46,7 @@ impl Solver {
         // If not, create a new pair.
         for i in 0..b.len() {
             if b[i].is_head() {
-                let pos: Coord = Board::inverse_ind(i);
+                let pos: Coord = b.inverse_ind(i);
                 if let Some(target) = flows.iter_mut().find(|flow| flow.color == b[i].color()) {
                     target.pair[1] = vec![pos];
                 } else {
@@ -144,7 +144,7 @@ impl Solver {
     fn some_pocket(&self) -> bool {
         'L: for i in 0..self.board.rows * self.board.cols {
             if self.board[i].is_empty() {
-                let (r, c) = Board::inverse_ind(i);
+                let (r, c) = self.board.inverse_ind(i);
                 if self.board.empty_neighbors(r, c).iter().flatten().count() == 0 {
                     for f in &self.flows {
                         for i in 0..=1 {
